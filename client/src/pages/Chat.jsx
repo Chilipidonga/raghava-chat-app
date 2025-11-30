@@ -9,8 +9,7 @@ import axios from 'axios';
 import ToastNotification from '../components/ToastNotification'; 
 
 // *** RENDER DEPLOYMENT URL (REPLACE THIS) ***
-const BACKEND_URL = "https://raghava-server-abc.onrender.com"; 
-
+const BACKEND_URL = "https://raghava-server-z8kq.onrender.com"; // <-- Use YOUR copied URL
 // Connect to Backend using the live URL
 const socket = io.connect(BACKEND_URL);
 

@@ -4,8 +4,7 @@ import axios from 'axios';
 import { Save, Lock, Loader } from 'lucide-react';
 
 // *** RENDER DEPLOYMENT URL (REPLACE THIS) ***
-const BACKEND_URL = "https://raghava-server-abc.onrender.com"; 
-
+const BACKEND_URL = "https://raghava-server-z8kq.onrender.com"; // <-- Use YOUR copied URL
 const PinSetup = () => {
   const navigate = useNavigate();
   // We assume userInfo is present from the previous step (Signup/Login)

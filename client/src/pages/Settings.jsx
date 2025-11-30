@@ -4,8 +4,7 @@ import axios from 'axios';
 import { Save, ArrowLeft, User, Loader, Lock, Key } from 'lucide-react';
 
 // *** RENDER DEPLOYMENT URL (REPLACE THIS) ***
-const BACKEND_URL = "https://raghava-server-abc.onrender.com"; 
-
+const BACKEND_URL = "https://raghava-server-z8kq.onrender.com"; // <-- Use YOUR copied URL
 const Settings = () => {
   const navigate = useNavigate();
   const userInfo = JSON.parse(localStorage.getItem('userInfo'));

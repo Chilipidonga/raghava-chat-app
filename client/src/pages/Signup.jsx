@@ -4,8 +4,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 
 // *** RENDER DEPLOYMENT URL (REPLACE THIS) ***
-const BACKEND_URL = "https://raghava-server-abc.onrender.com"; 
-
+const BACKEND_URL = "https://raghava-server-z8kq.onrender.com"; // <-- Use YOUR copied URL
 const Signup = () => {
   const navigate = useNavigate();
   // Steps: 1: Phone Input, 2: PIN Input
