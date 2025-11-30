@@ -60,6 +60,11 @@ app.get('/api/users/me/:id', async (req, res) => { /* ... */ });
 app.post('/api/users/unfriend', async (req, res) => { /* ... */ });
 app.post('/api/users/update-profile', async (req, res) => { /* ... */ });
 
+// Test Route to check if server is running
+app.get('/', (req, res) => {
+  res.send('🚀 Raghava Server is Running! Connect via the Frontend.');
+});
+
 // ... Chat Routes ...
 app.get('/api/messages/:room', async (req, res) => { /* ... */ });
 app.delete('/api/messages/:room', async (req, res) => { /* ... */ });
