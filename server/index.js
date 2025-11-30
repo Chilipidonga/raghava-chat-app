@@ -17,57 +17,61 @@ dotenv.config();
 const app = express();
 const server = http.createServer(app);
 
-// Setup Socket.io
+// *** DEPLOYMENT CONFIGURATION ***
+// This MUST match your live Vercel URL exactly (no trailing slash)
+const ALLOWED_ORIGIN = "https://raghava-chat-app.vercel.app";
+
+// 1. Setup Socket.io CORS
 const io = new Server(server, {
   cors: {
-    // Allow connections from any local frontend port
-    origin: "*", 
+    origin: ALLOWED_ORIGIN,
     methods: ["GET", "POST"]
   }
 });
 
-// Setup Gemini AI (Using the working model)
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-// We use the 2.5-flash model as verified by your diagnostic test
-const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+// 2. Setup Express CORS
+app.use(cors({
+  origin: ALLOWED_ORIGIN,
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE"]
+}));
 
-// Middleware
 app.use(express.json());
-app.use(cors());
+
+// Setup Gemini AI
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
 // Auth Routes
 app.use('/api/auth', authRoutes);
 
 // ==========================================
-// 👥 SOCIAL ROUTES (Friend System)
+// 👥 SOCIAL ROUTES
 // ==========================================
 
-// 1. Search Users (excluding self)
+// Search Users
 app.get('/api/users/search', async (req, res) => {
   try {
     const { query, currentUserId } = req.query;
-    // Search by username OR phone number
     const users = await User.find({
       $or: [
         { username: new RegExp(query, 'i') }, 
         { phoneNumber: new RegExp(query, 'i') }
       ],
-      _id: { $ne: currentUserId } // Don't find myself
-    }).select('-otp -otpExpires -password'); // Don't send sensitive data
-    
+      _id: { $ne: currentUserId }
+    }).select('-otp -otpExpires -password -pin');
     res.json(users);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// 2. Send Friend Request
+// Send Friend Request
 app.post('/api/users/request', async (req, res) => {
   try {
     const { fromId, toId } = req.body;
     const targetUser = await User.findById(toId);
     
-    // Check if already friends or requested
     if (!targetUser.incomingRequests.includes(fromId) && !targetUser.friends.includes(fromId)) {
       targetUser.incomingRequests.push(fromId);
       await targetUser.save();
@@ -78,18 +82,15 @@ app.post('/api/users/request', async (req, res) => {
   }
 });
 
-// 3. Accept Friend Request
+// Accept Friend Request
 app.post('/api/users/accept', async (req, res) => {
   try {
     const { userId, requestId } = req.body;
     const user = await User.findById(userId);
     const friend = await User.findById(requestId);
 
-    // Add to each other's friend lists
     user.friends.push(requestId);
     friend.friends.push(userId);
-    
-    // Remove from incoming requests
     user.incomingRequests = user.incomingRequests.filter(id => id.toString() !== requestId);
     
     await user.save();
@@ -100,7 +101,32 @@ app.post('/api/users/accept', async (req, res) => {
   }
 });
 
-// 4. Get My Data (Friends & Requests)
+// Unfriend / Remove Connection
+app.post('/api/users/unfriend', async (req, res) => {
+  try {
+    const { userId, friendId } = req.body;
+    await User.findByIdAndUpdate(userId, { $pull: { friends: friendId } });
+    await User.findByIdAndUpdate(friendId, { $pull: { friends: userId } });
+    res.json({ message: "Connection removed" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update Profile Name
+app.post('/api/users/update-profile', async (req, res) => {
+  try {
+    const { userId, username } = req.body;
+    if (!username || username.length < 3) return res.status(400).json({ message: "Name too short" });
+
+    const user = await User.findByIdAndUpdate(userId, { username }, { new: true });
+    res.json({ username: user.username, _id: user._id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get User Data
 app.get('/api/users/me/:id', async (req, res) => {
   try {
     const user = await User.findById(req.params.id)
@@ -111,75 +137,20 @@ app.get('/api/users/me/:id', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-// 5. Update User Profile (Username)
-app.post('/api/users/update-profile', async (req, res) => {
-  try {
-    const { userId, username } = req.body;
-    
-    if (!username || username.length < 3) {
-      return res.status(400).json({ message: "Username must be 3+ characters." });
-    }
 
-    const user = await User.findByIdAndUpdate(
-      userId,
-      { username: username },
-      { new: true, runValidators: true } // {new: true} returns the updated document
-    ).select('-otp -otpExpires -password');
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found." });
-    }
-
-    // You must also fetch the full user data again to update the client correctly
-    const updatedUser = await User.findById(user._id).select('-otp -otpExpires -password');
-    
-    // Return only the necessary data for client to update local storage
-    res.json({ username: updatedUser.username, _id: updatedUser._id }); 
-  } catch (err) {
-    console.error("Profile Update Error:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
-// 4. Unfriend / Remove Connection
-app.post('/api/users/unfriend', async (req, res) => {
-  try {
-    const { userId, friendId } = req.body;
-
-    // Remove friendId from userId's friend list
-    await User.findByIdAndUpdate(userId, {
-      $pull: { friends: friendId }
-    });
-
-    // Remove userId from friendId's friend list
-    await User.findByIdAndUpdate(friendId, {
-      $pull: { friends: userId }
-    });
-
-    res.json({ message: "Connection removed successfully" });
-  } catch (err) {
-    console.error("Unfriend Error:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ... (rest of the code continues)
 // ==========================================
-// 💬 CHAT ROUTES (History)
+// 💬 CHAT ROUTES
 // ==========================================
 
-// Get Messages for a Room
 app.get('/api/messages/:room', async (req, res) => {
   try {
-    const messages = await Message.find({ room: req.params.room })
-      .sort({ createdAt: 1 })
-      .limit(50);
+    const messages = await Message.find({ room: req.params.room }).sort({ createdAt: 1 }).limit(50);
     res.json(messages);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Clear History
 app.delete('/api/messages/:room', async (req, res) => {
   try {
     await Message.deleteMany({ room: req.params.room });
@@ -190,24 +161,14 @@ app.delete('/api/messages/:room', async (req, res) => {
 });
 
 // ==========================================
-// ⚡ SOCKET.IO LOGIC (Real-Time)
+// ⚡ SOCKET.IO LOGIC
 // ==========================================
 io.on('connection', (socket) => {
   console.log('⚡ User connected:', socket.id);
 
-  // 1. Handle Regular Chat Messages
   socket.on('send_message', async (data) => {
     try {
-      // Save to DB
-      const newMsg = new Message({
-        room: data.room,
-        author: data.author,
-        content: data.message,
-        timestamp: data.time
-      });
-      await newMsg.save();
-
-      // Broadcast to others (if not AI room)
+      await new Message(data).save();
       if (data.room !== 'ai-bot') {
         socket.broadcast.emit('receive_message', data);
       }
@@ -216,49 +177,33 @@ io.on('connection', (socket) => {
     }
   });
 
-  // 2. Handle AI Chat (Raghava's AI)
   socket.on('chat_with_ai', async (data) => {
     try {
-      // Save User Message
-      await new Message({
-        room: 'ai-bot',
-        author: data.author,
-        content: data.message,
-        timestamp: data.time
-      }).save();
-
-      // Ask Gemini
+      await new Message(data).save();
       const result = await model.generateContent(data.message);
       const aiText = result.response.text();
-      const aiTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-      // Save AI Message
-      const aiMsg = {
-        room: 'ai-bot',
-        author: "Raghava's AI", // Custom Bot Name
-        content: aiText,
-        timestamp: aiTime
+      
+      const aiMsg = { 
+        room: 'ai-bot', 
+        author: "Raghava's AI", 
+        content: aiText, 
+        timestamp: new Date().toLocaleTimeString() 
       };
       await new Message(aiMsg).save();
-
-      // Send back to user
       socket.emit('receive_message', { ...aiMsg, message: aiText });
-
     } catch (e) {
       console.error("AI Error:", e);
       socket.emit('receive_message', {
         room: 'ai-bot',
         author: "System",
-        message: "AI is busy. Try again later.",
+        message: "AI is offline.",
         timestamp: new Date().toLocaleTimeString()
       });
     }
   });
 
-  // 3. Smart Reply (Magic Wand)
   socket.on('request_smart_reply', async (data) => {
     try {
-      console.log("🪄 Generating reply for:", data.lastMessage);
       const prompt = `Generate a single, short, casual reply to: "${data.lastMessage}"`;
       const result = await model.generateContent(prompt);
       socket.emit('smart_reply_result', { suggestion: result.response.text() });
@@ -272,7 +217,6 @@ io.on('connection', (socket) => {
   });
 });
 
-// Connect DB & Start Server
 const PORT = process.env.PORT || 5000;
 mongoose.connect(process.env.MONGO_URI)
   .then(() => {
