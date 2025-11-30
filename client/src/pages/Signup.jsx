@@ -3,6 +3,9 @@ import { MessageSquare, ArrowRight, Loader, Lock, Key, ArrowLeft } from 'lucide-
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 
+// *** RENDER DEPLOYMENT URL (REPLACE THIS) ***
+const BACKEND_URL = "https://raghava-server-abc.onrender.com"; 
+
 const Signup = () => {
   const navigate = useNavigate();
   // Steps: 1: Phone Input, 2: PIN Input
@@ -27,7 +30,7 @@ const Signup = () => {
       const fullNumber = getFullNumber();
       
       // *** CORRECTED ENDPOINT: Now calls /check-status ***
-      const { data } = await axios.post('http://localhost:5000/api/auth/check-status', { phoneNumber: fullNumber });
+      const { data } = await axios.post(`${BACKEND_URL}/api/auth/check-status`, { phoneNumber: fullNumber });
       
       setUserStatus(data);
       
@@ -54,7 +57,7 @@ const Signup = () => {
     try {
       const fullNumber = getFullNumber();
       
-      const { data } = await axios.post('http://localhost:5000/api/auth/login-pin', { 
+      const { data } = await axios.post(`${BACKEND_URL}/api/auth/login-pin`, { 
         phoneNumber: fullNumber,
         pin: pin 
       });

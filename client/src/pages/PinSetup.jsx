@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Save, Lock, Loader } from 'lucide-react';
 
+// *** RENDER DEPLOYMENT URL (REPLACE THIS) ***
+const BACKEND_URL = "https://raghava-server-abc.onrender.com"; 
+
 const PinSetup = () => {
   const navigate = useNavigate();
   // We assume userInfo is present from the previous step (Signup/Login)
@@ -34,7 +37,7 @@ const PinSetup = () => {
     setLoading(true);
     try {
       // 1. API Call to set the PIN on the server
-      const res = await axios.post('http://localhost:5000/api/auth/set-pin', {
+      const res = await axios.post(`${BACKEND_URL}/api/auth/set-pin`, {
         userId: userInfo._id,
         pin: pin,
       });

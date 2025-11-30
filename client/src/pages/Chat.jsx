@@ -6,9 +6,13 @@ import {
 import { useNavigate } from 'react-router-dom';
 import io from 'socket.io-client';
 import axios from 'axios';
-import ToastNotification from '../components/ToastNotification'; // Assuming this component exists
+import ToastNotification from '../components/ToastNotification'; 
 
-const socket = io.connect("http://localhost:5000");
+// *** RENDER DEPLOYMENT URL (REPLACE THIS) ***
+const BACKEND_URL = "https://raghava-server-abc.onrender.com"; 
+
+// Connect to Backend using the live URL
+const socket = io.connect(BACKEND_URL);
 
 const Chat = () => {
   const navigate = useNavigate();
@@ -43,7 +47,7 @@ const Chat = () => {
 
   const fetchMyData = async (id) => {
     try {
-      const res = await axios.get(`http://localhost:5000/api/users/me/${id}`);
+      const res = await axios.get(`${BACKEND_URL}/api/users/me/${id}`);
       setFriends(res.data.friends);
       setRequests(res.data.incomingRequests);
     } catch (error) {
@@ -51,7 +55,6 @@ const Chat = () => {
     }
   };
 
-  // Helper: Scroll to bottom
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -62,7 +65,7 @@ const Chat = () => {
     if (searchQuery.length > 2) {
       const timer = setTimeout(async () => {
         try {
-          const res = await axios.get(`http://localhost:5000/api/users/search?query=${searchQuery}&currentUserId=${currentUser._id}`);
+          const res = await axios.get(`${BACKEND_URL}/api/users/search?query=${searchQuery}&currentUserId=${currentUser._id}`);
           setSearchResults(res.data);
         } catch (error) {
           console.error("Search failed:", error);
@@ -77,7 +80,7 @@ const Chat = () => {
   // 3. Friend Actions
   const sendRequest = async (toId) => {
     try {
-      await axios.post('http://localhost:5000/api/users/request', { fromId: currentUser._id, toId });
+      await axios.post(`${BACKEND_URL}/api/users/request`, { fromId: currentUser._id, toId });
       alert("Request Sent!");
       setSearchQuery(""); 
     } catch (error) {
@@ -87,7 +90,7 @@ const Chat = () => {
 
   const acceptRequest = async (requestId) => {
     try {
-      await axios.post('http://localhost:5000/api/users/accept', { userId: currentUser._id, requestId });
+      await axios.post(`${BACKEND_URL}/api/users/accept`, { userId: currentUser._id, requestId });
       fetchMyData(currentUser._id); 
     } catch (error) {
       alert("Failed to accept request");
@@ -97,7 +100,7 @@ const Chat = () => {
   // 4. Chat/Room Logic (Load History)
   useEffect(() => {
     if (selectedRoom) {
-      axios.get(`http://localhost:5000/api/messages/${selectedRoom}`).then(res => {
+      axios.get(`${BACKEND_URL}/api/messages/${selectedRoom}`).then(res => {
         const formatted = res.data.map(m => ({ ...m, message: m.content, time: m.timestamp }));
         setMessageList(formatted);
       }).catch(err => console.error(err));
@@ -111,9 +114,7 @@ const Chat = () => {
       if (selectedRoom === data.room) {
          setMessageList(prev => [...prev, data]);
       } 
-      
       // 2. NOTIFICATION LOGIC: Show notification if the room does NOT match
-      // Also ensure the message isn't from the current user (you don't notify yourself)
       else if (data.author !== (currentUser.username || currentUser.phoneNumber)) {
         setNotification({ author: data.author, message: data.message });
       }
@@ -130,7 +131,6 @@ const Chat = () => {
       socket.off("receive_message", handleReceiveMessage); 
       socket.off("smart_reply_result", handleSmartReply); 
     }
-    // Dependency cleanup: only refire listener when selectedRoom or currentUser changes
   }, [selectedRoom, currentUser.username, currentUser.phoneNumber]);
 
   // 6. Notification Timeout Effect
@@ -138,7 +138,7 @@ const Chat = () => {
     if (notification) {
       const timer = setTimeout(() => {
         setNotification(null);
-      }, 4000); // Notification disappears after 4 seconds
+      }, 4000); 
       return () => clearTimeout(timer);
     }
   }, [notification]);
@@ -174,7 +174,7 @@ const Chat = () => {
       return;
     }
     try {
-      await axios.delete(`http://localhost:5000/api/messages/${selectedRoom}`);
+      await axios.delete(`${BACKEND_URL}/api/messages/${selectedRoom}`);
       setMessageList([]); 
     } catch (error) {
       alert("Could not clear history");
@@ -193,7 +193,7 @@ const Chat = () => {
         
         if (!friendId) return;
 
-        await axios.post('http://localhost:5000/api/users/unfriend', {
+        await axios.post(`${BACKEND_URL}/api/users/unfriend`, {
             userId: currentUser._id,
             friendId: friendId
         });
@@ -215,6 +215,8 @@ const Chat = () => {
     if(lastMsg) socket.emit('request_smart_reply', { lastMessage: lastMsg.message });
   };
 
+  const navigateToSettings = () => navigate('/settings');
+  
   // User List Item Component (Unchanged)
   const UserItem = ({ user, type }) => (
     <div className="flex items-center justify-between p-3 hover:bg-gray-800 rounded-lg cursor-pointer transition border border-transparent hover:border-gray-700" onClick={() => type === 'friend' && startChat(user)}>
@@ -268,7 +270,7 @@ const Chat = () => {
               <button onClick={() => setShowMenu(!showMenu)}><MoreVertical size={20} className="text-gray-400 hover:text-white" /></button>
               {showMenu && (
                 <div className="absolute right-0 top-8 bg-gray-800 border border-gray-700 rounded-xl shadow-2xl w-48 py-2 z-50 overflow-hidden">
-                  <div onClick={() => navigate('/settings')} className="px-4 py-3 hover:bg-gray-700 text-gray-200 cursor-pointer flex gap-3 items-center"><CircleUser size={18}/> Profile</div>
+                  <div onClick={navigateToSettings} className="px-4 py-3 hover:bg-gray-700 text-gray-200 cursor-pointer flex gap-3 items-center"><CircleUser size={18}/> Profile</div>
                   <div className="px-4 py-3 hover:bg-gray-700 text-gray-200 cursor-pointer flex gap-3 items-center"><Settings size={18}/> Settings</div>
                   <div className="h-px bg-gray-700 my-1"></div>
                   <div onClick={() => { localStorage.clear(); navigate('/signup'); }} className="px-4 py-3 hover:bg-gray-700 text-red-400 cursor-pointer flex gap-3 items-center"><LogOut size={18}/> Logout</div>
