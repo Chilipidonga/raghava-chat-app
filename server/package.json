@@ -1,24 +1,21 @@
 {
-  "name": "server",
+  "name": "raghava-server",
   "version": "1.0.0",
-  "description": "",
+  "description": "Raghava Chat Backend",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node index.js",   
+    "dev": "nodemon index.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
-    "dotenv": "^17.2.3",
-    "express": "^5.1.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^9.0.0",
-    "nodemon": "^3.1.11",
-    "socket.io": "^4.8.1"
+    "mongoose": "^8.4.1",
+    "nodemon": "^3.1.1",
+    "socket.io": "^4.7.5"
   }
 }
