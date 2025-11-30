@@ -17,8 +17,8 @@ dotenv.config();
 const app = express();
 const server = http.createServer(app);
 
-// *** DEPLOYMENT CONFIGURATION ***
-// This MUST match your live Vercel URL exactly (no trailing slash)
+// *** CORS CONFIGURATION ***
+// This specific URL comes from your Vercel screenshot
 const ALLOWED_ORIGIN = "https://raghava-chat-app.vercel.app";
 
 // 1. Setup Socket.io CORS
@@ -49,7 +49,6 @@ app.use('/api/auth', authRoutes);
 // 👥 SOCIAL ROUTES
 // ==========================================
 
-// Search Users
 app.get('/api/users/search', async (req, res) => {
   try {
     const { query, currentUserId } = req.query;
@@ -66,7 +65,6 @@ app.get('/api/users/search', async (req, res) => {
   }
 });
 
-// Send Friend Request
 app.post('/api/users/request', async (req, res) => {
   try {
     const { fromId, toId } = req.body;
@@ -82,7 +80,6 @@ app.post('/api/users/request', async (req, res) => {
   }
 });
 
-// Accept Friend Request
 app.post('/api/users/accept', async (req, res) => {
   try {
     const { userId, requestId } = req.body;
@@ -101,7 +98,6 @@ app.post('/api/users/accept', async (req, res) => {
   }
 });
 
-// Unfriend / Remove Connection
 app.post('/api/users/unfriend', async (req, res) => {
   try {
     const { userId, friendId } = req.body;
@@ -113,7 +109,6 @@ app.post('/api/users/unfriend', async (req, res) => {
   }
 });
 
-// Update Profile Name
 app.post('/api/users/update-profile', async (req, res) => {
   try {
     const { userId, username } = req.body;
@@ -126,7 +121,6 @@ app.post('/api/users/update-profile', async (req, res) => {
   }
 });
 
-// Get User Data
 app.get('/api/users/me/:id', async (req, res) => {
   try {
     const user = await User.findById(req.params.id)
