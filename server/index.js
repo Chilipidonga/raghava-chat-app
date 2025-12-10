@@ -5,7 +5,7 @@ const mongoose = require('mongoose');
 const http = require('http');
 const { Server } = require('socket.io');
 
-// Routes & Models
+// Routes
 const authRoutes = require('./routes/authRoutes');
 const Message = require('./models/Message');
 
@@ -14,63 +14,73 @@ const server = http.createServer(app);
 
 const PORT = process.env.PORT || 5000;
 
-// --- FIX: Dynamic CORS handling to debug exact origin issues ---
+// --- 1. DEFINED ORIGINS ---
+const allowedOrigins = [
+  "http://localhost:5173",             // Your local frontend
+  "http://localhost:5174",             // Sometimes Vite uses this port
+  "https://raghava-chat-app.vercel.app" // Your live frontend
+];
+
+// --- 2. CORS CONFIGURATION ---
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
+    // Allow requests with no origin (like mobile apps or curl)
     if (!origin) return callback(null, true);
     
-    // Explicitly allow your Vercel app and Localhost
-    const allowedOrigins = [
-      'http://localhost:5173',
-      'https://raghava-chat-app.vercel.app'
-    ];
-    
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      return callback(new Error(msg), false);
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      return callback(null, true);
+    } else {
+      console.log("❌ CORS Blocked Origin:", origin); // Log blocked attempts
+      return callback(new Error('Not allowed by CORS'));
     }
-    return callback(null, true);
   },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  credentials: true, // Allow cookies/headers
+  allowedHeaders: ["Content-Type", "Authorization"]
 };
 
-// Apply CORS to Express
+// --- 3. APPLY CORS MIDDLEWARE ---
 app.use(cors(corsOptions));
+// Explicitly handle pre-flight requests (OPTIONS)
+app.options('*', cors(corsOptions)); 
+
 app.use(express.json());
 
-// Apply CORS to Socket.io
+// --- 4. DEBUG LOGGING MIDDLEWARE ---
+app.use((req, res, next) => {
+  console.log(`📡 Request: ${req.method} ${req.url} from Origin: ${req.headers.origin}`);
+  next();
+});
+
+// --- 5. ROUTES ---
+app.use('/api/auth', authRoutes);
+app.get('/', (req, res) => res.send('🚀 Server is Running!'));
+
+// --- 6. SOCKET.IO SETUP ---
 const io = new Server(server, {
   cors: {
-    origin: ["https://raghava-chat-app.vercel.app", "http://localhost:5173"], // Be specific here
+    origin: allowedOrigins,
     methods: ["GET", "POST"],
     credentials: true
   }
 });
 
-// Routes
-app.use('/api/auth', authRoutes);
-app.get('/', (req, res) => res.send('🚀 Raghava Server is Running!'));
-
-// Socket Logic
 io.on('connection', (socket) => {
-  console.log('✅ New client connected:', socket.id);
-  socket.on('joinRoom', (room) => socket.join(room));
+  console.log('✅ Socket Connected:', socket.id);
+  
   socket.on('sendMessage', async (data) => {
-    const { room, sender, message } = data;
-    const newMessage = await Message.create({ room, sender, message });
-    io.to(room).emit('receiveMessage', newMessage);
+    // Your message logic
+    io.emit('receiveMessage', data);
   });
+
+  socket.on('disconnect', () => console.log('❌ Socket Disconnected:', socket.id));
 });
 
-// --- FIX: Ensure Server Starts even if Mongo fails (for debugging) ---
+// --- 7. DATABASE & SERVER START ---
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('✅ MongoDB Connected'))
   .catch((err) => console.log('❌ MongoDB Error:', err.message));
 
-// Move server.listen OUTSIDE the mongoose.then block
-// This ensures your server answers requests even if DB is slow to connect
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
