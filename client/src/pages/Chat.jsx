@@ -4,14 +4,14 @@ import {
   Wand2, Zap, UserPlus, Check, X, Settings, CircleUser, Image, LogOut, UserX
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import io from 'socket.io-client';
 import axios from 'axios';
 import ToastNotification from '../components/ToastNotification'; 
 
-// *** RENDER DEPLOYMENT URL (REPLACE THIS) ***
-const BACKEND_URL = "https://raghava-server-z8kq.onrender.com"; // <-- Use YOUR copied URL
-// Connect to Backend using the live URL
-const socket = io.connect(BACKEND_URL);
+// --- FIX 1: Import the shared socket instance ---
+import socket from '../socket'; 
+
+// Keep this for API calls (Axios), but NOT for socket anymore
+const BACKEND_URL = "https://raghava-server-z8kq.onrender.com"; 
 
 const Chat = () => {
   const navigate = useNavigate();
@@ -108,12 +108,19 @@ const Chat = () => {
 
   // 5. Socket Listener (Real-Time Updates + NOTIFICATION LOGIC)
   useEffect(() => {
+    // --- FIX 2: Connect manually when component mounts ---
+    socket.connect();
+
+    // Optional: Debugging logs
+    socket.on("connect", () => console.log("✅ Connected:", socket.id));
+    socket.on("connect_error", (err) => console.log("❌ Error:", err.message));
+
     const handleReceiveMessage = (data) => {
       // 1. Always update the message list if the room matches
       if (selectedRoom === data.room) {
          setMessageList(prev => [...prev, data]);
       } 
-      // 2. NOTIFICATION LOGIC: Show notification if the room does NOT match
+      // 2. NOTIFICATION LOGIC
       else if (data.author !== (currentUser.username || currentUser.phoneNumber)) {
         setNotification({ author: data.author, message: data.message });
       }
@@ -129,6 +136,8 @@ const Chat = () => {
     return () => { 
       socket.off("receive_message", handleReceiveMessage); 
       socket.off("smart_reply_result", handleSmartReply); 
+      // --- FIX 3: Disconnect cleanly when leaving chat ---
+      socket.disconnect();
     }
   }, [selectedRoom, currentUser.username, currentUser.phoneNumber]);
 
@@ -216,7 +225,7 @@ const Chat = () => {
 
   const navigateToSettings = () => navigate('/settings');
   
-  // User List Item Component (Unchanged)
+  // User List Item Component
   const UserItem = ({ user, type }) => (
     <div className="flex items-center justify-between p-3 hover:bg-gray-800 rounded-lg cursor-pointer transition border border-transparent hover:border-gray-700" onClick={() => type === 'friend' && startChat(user)}>
       <div className="flex items-center gap-3">

@@ -1,95 +1,76 @@
 require('dotenv').config();
-
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const http = require('http');
 const { Server } = require('socket.io');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 // Routes & Models
 const authRoutes = require('./routes/authRoutes');
 const Message = require('./models/Message');
-const User = require('./models/User');
 
 const app = express();
 const server = http.createServer(app);
 
-// ✅ Allowed origins
-const ALLOWED_ORIGINS = [
-  'http://localhost:5173',
-  'https://raghava-chat-app.vercel.app'
-];
+const PORT = process.env.PORT || 5000;
 
-// ✅ Express CORS
-app.use(cors({
-  origin: ALLOWED_ORIGINS,
+// --- FIX: Dynamic CORS handling to debug exact origin issues ---
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Explicitly allow your Vercel app and Localhost
+    const allowedOrigins = [
+      'http://localhost:5173',
+      'https://raghava-chat-app.vercel.app'
+    ];
+    
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-}));
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+};
 
+// Apply CORS to Express
+app.use(cors(corsOptions));
 app.use(express.json());
 
-// ✅ Socket.io CORS
+// Apply CORS to Socket.io
 const io = new Server(server, {
   cors: {
-    origin: ALLOWED_ORIGINS,
-    methods: ['GET', 'POST']
+    origin: ["https://raghava-chat-app.vercel.app", "http://localhost:5173"], // Be specific here
+    methods: ["GET", "POST"],
+    credentials: true
   }
 });
 
-// ✅ Gemini AI
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-
-// ✅ Routes
+// Routes
 app.use('/api/auth', authRoutes);
+app.get('/', (req, res) => res.send('🚀 Raghava Server is Running!'));
 
-// ✅ Health check
-app.get('/', (req, res) => {
-  res.send('🚀 Raghava Server is Running!');
-});
-
-// ✅ Test route
-app.get('/api/test', (req, res) => {
-  res.json({ status: 'ok' });
-});
-
-// ✅ Socket logic
+// Socket Logic
 io.on('connection', (socket) => {
   console.log('✅ New client connected:', socket.id);
-
-  socket.on('joinRoom', (room) => {
-    socket.join(room);
-  });
-
+  socket.on('joinRoom', (room) => socket.join(room));
   socket.on('sendMessage', async (data) => {
     const { room, sender, message } = data;
-
-    const newMessage = await Message.create({
-      room,
-      sender,
-      message,
-    });
-
+    const newMessage = await Message.create({ room, sender, message });
     io.to(room).emit('receiveMessage', newMessage);
-  });
-
-  socket.on('disconnect', () => {
-    console.log('❌ Client disconnected:', socket.id);
   });
 });
 
-// ✅ Start server
-const PORT = process.env.PORT || 5000;
-
+// --- FIX: Ensure Server Starts even if Mongo fails (for debugging) ---
 mongoose.connect(process.env.MONGO_URI)
-  .then(() => {
-    console.log('✅ MongoDB Connected');
-    server.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
-    });
-  })
-  .catch((err) => {
-    console.log('❌ MongoDB Error:', err.message);
-  });
+  .then(() => console.log('✅ MongoDB Connected'))
+  .catch((err) => console.log('❌ MongoDB Error:', err.message));
+
+// Move server.listen OUTSIDE the mongoose.then block
+// This ensures your server answers requests even if DB is slow to connect
+server.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+});
